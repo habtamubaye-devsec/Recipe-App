@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 const THEMEALDB_BASE = "https://www.themealdb.com/api/json/v1/1";
@@ -31,6 +32,7 @@ type Category = {
 export default function Home() {
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
+  const [filterType, setFilterType] = useState<"all" | "area" | "category">("all");
   const [categories, setCategories] = useState<Category[]>([]);
   const [meals, setMeals] = useState<Meal[]>([]);
   const [featuredMeal, setFeaturedMeal] = useState<Meal | null>(null);
@@ -73,7 +75,7 @@ export default function Home() {
 
   useEffect(() => {
     const searchMeals = async () => {
-      if (!query.trim() && activeFilter === "All") {
+      if (!query.trim() && filterType === "all") {
         return;
       }
 
@@ -81,9 +83,15 @@ export default function Home() {
         setLoading(true);
         setError(null);
 
-        const response = query.trim()
-          ? await fetch(`${THEMEALDB_BASE}/search.php?s=${encodeURIComponent(query.trim())}`)
-          : await fetch(`${THEMEALDB_BASE}/filter.php?c=${encodeURIComponent(activeFilter)}`);
+        let response: Response;
+
+        if (query.trim()) {
+          response = await fetch(`${THEMEALDB_BASE}/search.php?s=${encodeURIComponent(query.trim())}`);
+        } else if (filterType === "area") {
+          response = await fetch(`${THEMEALDB_BASE}/filter.php?a=${encodeURIComponent(activeFilter)}`);
+        } else {
+          response = await fetch(`${THEMEALDB_BASE}/filter.php?c=${encodeURIComponent(activeFilter)}`);
+        }
 
         const data = await response.json();
         setMeals((data.meals || []).slice(0, 12));
@@ -95,10 +103,10 @@ export default function Home() {
       }
     };
 
-    if (query.trim() || activeFilter !== "All") {
+    if (query.trim() || filterType !== "all") {
       searchMeals();
     }
-  }, [query, activeFilter]);
+  }, [query, activeFilter, filterType]);
 
   const visibleMeals = useMemo(() => meals, [meals]);
 
@@ -138,7 +146,10 @@ export default function Home() {
               </label>
               <button
                 type="button"
-                onClick={() => setActiveFilter("All")}
+                onClick={() => {
+                  setActiveFilter("All");
+                  setFilterType("all");
+                }}
                 className="rounded-2xl bg-orange-600 px-5 py-3 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5"
               >
                 Reset filters
@@ -153,9 +164,10 @@ export default function Home() {
                   onClick={() => {
                     setQuery("");
                     setActiveFilter(area);
+                    setFilterType("area");
                   }}
                   className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                    activeFilter === area
+                    filterType === "area" && activeFilter === area
                       ? "border-transparent bg-orange-950 text-white"
                       : "border-orange-200 bg-white/75 text-orange-950 hover:bg-white"
                   }`}
@@ -229,9 +241,10 @@ export default function Home() {
                 onClick={() => {
                   setQuery("");
                   setActiveFilter(category.strCategory);
+                  setFilterType("category");
                 }}
                 className={`group overflow-hidden rounded-3xl border p-3 text-left transition hover:-translate-y-1 ${
-                  activeFilter === category.strCategory
+                  filterType === "category" && activeFilter === category.strCategory
                     ? "border-transparent bg-orange-950 text-white"
                     : "border-orange-200 bg-white/80 text-orange-950"
                 }`}
@@ -256,9 +269,9 @@ export default function Home() {
               >
                 {query.trim()
                   ? `Search results for “${query.trim()}”`
-                  : activeFilter === "All"
+                  : filterType === "all"
                     ? "Recommended recipes"
-                    : `${activeFilter} recipes`}
+                    : `${activeFilter} ${filterType === "area" ? "meals" : "recipes"}`}
               </h3>
               <p className="mt-2 text-sm text-[rgba(31,19,15,0.62)]">
                 Tap a card and keep exploring with the next search or category choice.
@@ -282,8 +295,9 @@ export default function Home() {
                   />
                 ))
               : visibleMeals.map((meal) => (
-                  <article
+                  <Link
                     key={meal.idMeal}
+                    href={`/recipe/${meal.idMeal}`}
                     className="group overflow-hidden rounded-3xl border border-orange-200 bg-white/85 shadow-sm transition hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(104,52,28,0.12)]"
                   >
                     <img
@@ -303,7 +317,7 @@ export default function Home() {
                         {meal.strInstructions || "Open the card to find the full recipe details."}
                       </p>
                     </div>
-                  </article>
+                  </Link>
                 ))}
           </div>
         </div>
